@@ -68,6 +68,10 @@ def todos():
 def todos_POST():
     if not session.get('logged_in'):
         return redirect('/login')
+    #Task 1: Check for empty description or only containing spaces.
+    description = request.form.get('description', '')
+    if description.strip() == '':
+        return redirect('/todo')
     g.db.execute(
         "INSERT INTO todos (user_id, description) VALUES ('%s', '%s')"
         % (session['user']['id'], request.form.get('description', ''))
