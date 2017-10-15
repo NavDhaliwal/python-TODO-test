@@ -1,4 +1,5 @@
 from alayatodo import app
+import json
 from flask import (
     g,
     redirect,
@@ -47,8 +48,8 @@ def logout():
 
 @app.route('/todo/<id>', methods=['GET'])
 def todo(id):
-    sql = "SELECT * FROM todos WHERE user_id = '%s'";
-    cur = g.db.execute(sql % session['user']['id'])
+    sql = "SELECT * FROM todos WHERE user_id = '%s' and id = '%s'";
+    cur = g.db.execute(sql % (session['user']['id'],id))
     todo = cur.fetchone()
     return render_template('todo.html', todo=todo)
 
@@ -108,3 +109,21 @@ def todo_delete(id):
     g.db.commit()
     return redirect('/todo')
 
+@app.route('/todo/<id>/json', methods=['GET'])
+@app.route('/todo/<id>/json/', methods=['GET'])
+def todo_view_json(id):
+    if not session.get('logged_in'):
+        return redirect('/login')
+
+    sql = "SELECT * FROM todos WHERE user_id = '%s' and id = '%s'";
+    cur = g.db.execute(sql % (session['user']['id'],id))
+    todo = cur.fetchone()
+    value_list=[]
+    for item in todo:
+        value_list.append(item)
+
+    table_cols = [description[0] for description in cur.description]
+
+    json_dict=dict(zip(table_cols, value_list))
+    json_str = json.dumps(json_dict,indent=4)
+    return render_template('todo_json.html', json_str=json_str)
