@@ -7,6 +7,7 @@ from flask import (
     session
     )
 
+TODO_STATUS_COL=3
 
 @app.route('/')
 def home():
@@ -70,13 +71,32 @@ def todos_POST():
         return redirect('/login')
     #Task 1: Check for empty description or only containing spaces.
     description = request.form.get('description', '')
-    if description.strip() == '':
+    if description.strip() != '':
+        g.db.execute("INSERT INTO todos (user_id, description) VALUES ('%s', '%s')"
+            % (session['user']['id'], request.form.get('description', ''))
+        )
+        g.db.commit()
         return redirect('/todo')
-    g.db.execute(
-        "INSERT INTO todos (user_id, description) VALUES ('%s', '%s')"
-        % (session['user']['id'], request.form.get('description', ''))
-    )
-    g.db.commit()
+
+    #Task 2: Adding status functionality
+    sql = "SELECT * FROM todos WHERE user_id = '%s'";
+    cur = g.db.execute(sql % session['user']['id'])
+    todos = cur.fetchall()
+
+    statusBtnID=int(request.form['statusBtn'])
+    COLUMN = 0 # id column
+    column=[elt[COLUMN] for elt in todos]
+    #statusBtn was clicked
+    if statusBtnID in column:
+        index=column.index(statusBtnID)
+        COLUMN = TODO_STATUS_COL
+        column=[elt[COLUMN] for elt in todos]
+        if int(column[index])==0:
+            g.db.execute("UPDATE todos SET status=1 where id = '%s'"% statusBtnID)
+            g.db.commit()
+        else:
+            g.db.execute("UPDATE todos SET status=0 where id = '%s'"% statusBtnID)
+            g.db.commit()
     return redirect('/todo')
 
 
@@ -87,3 +107,4 @@ def todo_delete(id):
     g.db.execute("DELETE FROM todos WHERE id ='%s'" % id)
     g.db.commit()
     return redirect('/todo')
+

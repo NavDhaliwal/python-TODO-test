@@ -15,6 +15,23 @@
                     </a>
                 </td>
                 <td>
+                    
+                    <form method="post" action="{{ url_for('todos_POST') }}">
+                        {% if todo.status!=0 %}
+                        <td>
+                            <button name="statusBtn" value="{{ todo.id }}" type="submit" class="btn btn-sm btn-primary" style="background-color:green">Done</button>
+                        </td>
+                        {% else %}
+                        <td>
+                            <button name="statusBtn" value="{{ todo.id }}" type="submit" class="btn btn-sm btn-primary">Active</button>
+                        </td>
+                        {% endif %}
+                        
+                    </form>
+                    
+                    
+                </td>
+                <td>
                     <form method="post" action="{{ url_for('todo_delete', id=todo.id) }}">
                         <button type="submit" class="btn btn-xs btn-danger"><span class="glyphicon glyphicon-remove glyphicon-white"></span></button>
                     </form>
@@ -34,3 +51,4 @@
     </table>
 </div>
 {% endblock %}
+
