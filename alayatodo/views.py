@@ -5,7 +5,8 @@ from flask import (
     redirect,
     render_template,
     request,
-    session
+    session,
+    flash
     )
 
 TODO_STATUS_COL=3
@@ -65,25 +66,22 @@ def todos():
     return render_template('todos.html', todos=todos)
 
 
-@app.route('/todo', methods=['POST'])
-@app.route('/todo/', methods=['POST'])
-def todos_POST():
-    if not session.get('logged_in'):
-        return redirect('/login')
+def addTODO():
+    #print('Add btn pressed')
     #Task 1: Check for empty description or only containing spaces.
     description = request.form.get('description', '')
     if description.strip() != '':
-        g.db.execute("INSERT INTO todos (user_id, description) VALUES ('%s', '%s')"
-            % (session['user']['id'], request.form.get('description', ''))
-        )
+        g.db.execute("INSERT INTO todos (user_id, description) VALUES ('%s', '%s')"% (session['user']['id'],request.form.get('description', '')))
         g.db.commit()
-        return redirect('/todo')
+        flash('TODO successfully added.',category='success')
 
+
+def updateStatus():
+    #print('Status btn pressed')
     #Task 2: Adding status functionality
     sql = "SELECT * FROM todos WHERE user_id = '%s'";
     cur = g.db.execute(sql % session['user']['id'])
     todos = cur.fetchall()
-
     statusBtnID=int(request.form['statusBtn'])
     COLUMN = 0 # id column
     column=[elt[COLUMN] for elt in todos]
@@ -98,8 +96,18 @@ def todos_POST():
         else:
             g.db.execute("UPDATE todos SET status=0 where id = '%s'"% statusBtnID)
             g.db.commit()
-    return redirect('/todo')
 
+@app.route('/todo', methods=['POST'])
+@app.route('/todo/', methods=['POST'])
+def todos_POST():
+    if not session.get('logged_in'):
+        return redirect('/login')
+    
+    if 'addBtn' in request.form:
+        addTODO()
+    if 'statusBtn' in request.form:
+        updateStatus()
+    return redirect('/todo')
 
 @app.route('/todo/<id>', methods=['POST'])
 def todo_delete(id):
@@ -107,6 +115,7 @@ def todo_delete(id):
         return redirect('/login')
     g.db.execute("DELETE FROM todos WHERE id ='%s'" % id)
     g.db.commit()
+    flash('TODO successfully deleted.',category='success')
     return redirect('/todo')
 
 @app.route('/todo/<id>/json', methods=['GET'])
