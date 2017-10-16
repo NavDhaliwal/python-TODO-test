@@ -6,7 +6,8 @@ from flask import (
     render_template,
     request,
     session,
-    flash
+    flash,
+    jsonify
     )
 
 TODO_STATUS_COL=3
@@ -135,4 +136,5 @@ def todo_view_json(id):
 
     json_dict=dict(zip(table_cols, value_list))
     json_str = json.dumps(json_dict,indent=4)
-    return render_template('todo_json.html', json_str=json_str)
+    return jsonify(json_dict)
+#return render_template('todo_json.html', json_str=json_str)
