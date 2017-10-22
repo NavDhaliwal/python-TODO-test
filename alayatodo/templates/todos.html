@@ -48,6 +48,17 @@
                 </td>
             </form>
         </tr>
+        
+        <tr>
+            <form method="post" action="{{ url_for('todos_navigation', page_num=page_num) }}">
+                <td colspan="3">
+                    <button name="Previous" value="prev_page" type="submit" class="btn btn-sm btn-primary">Previous</button>
+                </td>
+                <td>
+                    <button name="Next" value="next_page" type="submit" class="btn btn-sm btn-primary">Next</button>
+                </td>
+            </form>
+        </tr>
     </table>
 </div>
 {% endblock %}

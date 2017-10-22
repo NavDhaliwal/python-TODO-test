@@ -1,5 +1,5 @@
 from alayatodo import app
-import json
+import json, math
 from flask import (
     g,
     redirect,
@@ -11,6 +11,7 @@ from flask import (
     )
 
 TODO_STATUS_COL=3
+NUM_TODOS_PER_PAGE=2
 
 @app.route('/')
 def home():
@@ -36,7 +37,8 @@ def login_POST():
     if user:
         session['user'] = dict(user)
         session['logged_in'] = True
-        return redirect('/todo')
+        session['current_page']=1
+        return redirect('/todo/page/1')
 
     return redirect('/login')
 
@@ -45,6 +47,7 @@ def login_POST():
 def logout():
     session.pop('logged_in', None)
     session.pop('user', None)
+    session.pop('current_page', None)
     return redirect('/')
 
 
@@ -56,15 +59,39 @@ def todo(id):
     return render_template('todo.html', todo=todo)
 
 
-@app.route('/todo', methods=['GET'])
-@app.route('/todo/', methods=['GET'])
-def todos():
+@app.route('/todo/page/<int:page_num>', methods=['POST'])
+@app.route('/todo/page/<int:page_num>/', methods=['POST'])
+def todos_navigation(page_num):
+
+    if 'Previous' in request.form:
+        page_num=page_num-1
+    elif 'Next' in request.form:
+        page_num=page_num+1
+
+    if page_num<=0:
+        page_num=1
+    return redirect('/todo/page/'+str(page_num))
+
+
+@app.route('/todo/page/<int:page_num>', methods=['GET'])
+@app.route('/todo/page/<int:page_num>/', methods=['GET'])
+def todos(page_num):
     if not session.get('logged_in'):
         return redirect('/login')
     sql = "SELECT * FROM todos WHERE user_id = '%s'";
     cur = g.db.execute(sql % session['user']['id'])
     todos = cur.fetchall()
-    return render_template('todos.html', todos=todos)
+
+    max_page_num=math.ceil(len(todos)/NUM_TODOS_PER_PAGE)
+    if page_num<=0:
+        page_num=1
+    elif page_num>max_page_num:
+        page_num=max_page_num
+    session['current_page']=page_num
+    start_idx=NUM_TODOS_PER_PAGE*(session['current_page']-1)
+    end_idx=start_idx+NUM_TODOS_PER_PAGE
+
+    return render_template('todos.html', todos=todos[start_idx:end_idx],page_num=page_num)
 
 
 def addTODO():
