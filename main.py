@@ -30,9 +30,13 @@ if __name__ == '__main__':
     args = docopt(__doc__)
     #print (app.config['DATABASE'])
     if args['initdb']:
-        _run_sql('resources/database.sql')
-        _run_sql('resources/fixtures.sql')
+        path1=os.path.join('resources','sqlalchemy_declarative.py')
+        os.system('python3 '+path1)
+        path2=os.path.join('resources','sqlalchemy_insert.py')
+        os.system('python3 '+path2)
+        #_run_sql('resources/database.sql')
+        #_run_sql('resources/fixtures.sql')
         print ("AlayaTodo: Database initialized.")
-        addTODOstatus()
+        #addTODOstatus()
     else:
         app.run(use_reloader=True)

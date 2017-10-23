@@ -16,7 +16,7 @@
                 </td>
                 <td>
                     
-                    <form method="post" action="{{ url_for('todos_POST') }}">
+                    <form method="post" action="{{ url_for('todos_POST',page_num=page_num) }}">
                         {% if todo.status!=0 %}
                         <td>
                             <button name="statusBtn" value="{{ todo.id }}" type="submit" class="btn btn-sm btn-primary" style="background-color:green">Done</button>
@@ -32,14 +32,14 @@
                     
                 </td>
                 <td>
-                    <form method="post" action="{{ url_for('todo_delete', id=todo.id) }}">
-                        <button type="submit" class="btn btn-xs btn-danger"><span class="glyphicon glyphicon-remove glyphicon-white"></span></button>
+                    <form method="post" action="{{ url_for('todos_POST',page_num=page_num) }}">
+                        <button name="deleteBtn" value="{{ todo.id }}" type="submit" class="btn btn-xs btn-danger"><span class="glyphicon glyphicon-remove glyphicon-white"></span></button>
                     </form>
                 </td>
             </tr>
         {% endfor %}
         <tr>
-            <form method="post" action="{{ url_for('todos_POST') }}">
+            <form method="post" action="{{ url_for('todos_POST',page_num=page_num) }}">
                 <td colspan="3">
                     <input type="textbox" name="description" class="small-6 small-center" placeholder="Description...">
                 </td>

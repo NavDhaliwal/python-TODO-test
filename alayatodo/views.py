@@ -1,5 +1,5 @@
 from alayatodo import app
-import json, math
+import json, math, os, sys
 from flask import (
     g,
     redirect,
@@ -12,6 +12,19 @@ from flask import (
 
 TODO_STATUS_COL=3
 NUM_TODOS_PER_PAGE=2
+
+resource_path = os.path.abspath(os.path.join('..', 'resources'))
+sys.path.append(resource_path)
+
+from sqlalchemy.inspection import inspect
+from resources.sqlalchemy_declarative import usersTB, Base, todosTB
+from sqlalchemy import create_engine, and_, or_, not_
+engine = create_engine('sqlite:///sqlalchemy_todo.db')
+Base.metadata.bind = engine
+from sqlalchemy.orm import sessionmaker
+DBSession = sessionmaker()
+DBSession.bind = engine
+dbsession = DBSession()
 
 @app.route('/')
 def home():
@@ -31,11 +44,14 @@ def login_POST():
     username = request.form.get('username')
     password = request.form.get('password')
 
-    sql = "SELECT * FROM users WHERE username = '%s' AND password = '%s'";
-    cur = g.db.execute(sql % (username, password))
-    user = cur.fetchone()
+    user = dbsession.query(usersTB).filter(and_(usersTB.username.like(username), usersTB.password.like(password))).one()
+    #sql = "SELECT * FROM users WHERE username = '%s' AND password = '%s'";
+    #cur = g.db.execute(sql % (username, password))
+    #user = cur.fetchone()
     if user:
-        session['user'] = dict(user)
+        dictret = dict(user.__dict__)
+        dictret.pop('_sa_instance_state', None)
+        session['user'] = dictret
         session['logged_in'] = True
         session['current_page']=1
         return redirect('/todo/page/1')
@@ -53,9 +69,10 @@ def logout():
 
 @app.route('/todo/<id>', methods=['GET'])
 def todo(id):
-    sql = "SELECT * FROM todos WHERE user_id = '%s' and id = '%s'";
-    cur = g.db.execute(sql % (session['user']['id'],id))
-    todo = cur.fetchone()
+    #sql = "SELECT * FROM todos WHERE user_id = '%s' and id = '%s'";
+    #cur = g.db.execute(sql % (session['user']['id'],id))
+    #todo = cur.fetchone()
+    todo = dbsession.query(todosTB).filter(todosTB.id == id).one()
     return render_template('todo.html', todo=todo)
 
 
@@ -78,9 +95,11 @@ def todos_navigation(page_num):
 def todos(page_num):
     if not session.get('logged_in'):
         return redirect('/login')
-    sql = "SELECT * FROM todos WHERE user_id = '%s'";
-    cur = g.db.execute(sql % session['user']['id'])
-    todos = cur.fetchall()
+
+    todos = dbsession.query(todosTB).filter(todosTB.user_id == session['user']['id']).all()
+    #sql = "SELECT * FROM todos WHERE user_id = '%s'";
+    #cur = g.db.execute(sql % session['user']['id'])
+    #todos = cur.fetchall()
 
     max_page_num=math.ceil(len(todos)/NUM_TODOS_PER_PAGE)
     if page_num<=0:
@@ -99,35 +118,44 @@ def addTODO():
     #Task 1: Check for empty description or only containing spaces.
     description = request.form.get('description', '')
     if description.strip() != '':
-        g.db.execute("INSERT INTO todos (user_id, description) VALUES ('%s', '%s')"% (session['user']['id'],request.form.get('description', '')))
-        g.db.commit()
+        #g.db.execute("INSERT INTO todos (user_id, description) VALUES ('%s', '%s')"% (session['user']['id'],request.form.get('description', '')))
+        #g.db.commit()
+        user=dbsession.query(usersTB).filter(usersTB.id == session['user']['id']).one()
+        new_todo = todosTB(description=description.strip(), users=user)
+        dbsession.add(new_todo)
+        dbsession.commit()
         flash('TODO successfully added.',category='success')
 
 
 def updateStatus():
     #print('Status btn pressed')
     #Task 2: Adding status functionality
-    sql = "SELECT * FROM todos WHERE user_id = '%s'";
-    cur = g.db.execute(sql % session['user']['id'])
-    todos = cur.fetchall()
+    #sql = "SELECT * FROM todos WHERE user_id = '%s'";
+    #cur = g.db.execute(sql % session['user']['id'])
+    #todos = cur.fetchall()
     statusBtnID=int(request.form['statusBtn'])
-    COLUMN = 0 # id column
-    column=[elt[COLUMN] for elt in todos]
+    todo_sel = dbsession.query(todosTB).filter(and_(todosTB.user_id.like(session['user']['id']),todosTB.id.like(statusBtnID))).one()
+    #COLUMN = 0 # id column
+    #column=[elt[COLUMN] for elt in todos]
     #statusBtn was clicked
-    if statusBtnID in column:
-        index=column.index(statusBtnID)
-        COLUMN = TODO_STATUS_COL
-        column=[elt[COLUMN] for elt in todos]
-        if int(column[index])==0:
-            g.db.execute("UPDATE todos SET status=1 where id = '%s'"% statusBtnID)
-            g.db.commit()
-        else:
-            g.db.execute("UPDATE todos SET status=0 where id = '%s'"% statusBtnID)
-            g.db.commit()
+    #if statusBtnID in column:
+    #    index=column.index(statusBtnID)
+    #    COLUMN = TODO_STATUS_COL
+    #    column=[elt[COLUMN] for elt in todos]
+    if todo_sel.status==0:
+        #g.db.execute("UPDATE todos SET status=1 where id = '%s'"% statusBtnID)
+        #g.db.commit()
+        todo_sel.status=1
+    else:
+        #g.db.execute("UPDATE todos SET status=0 where id = '%s'"% statusBtnID)
+        #g.db.commit()
+        todo_sel.status=0
+    dbsession.commit()
+                                            
 
-@app.route('/todo', methods=['POST'])
-@app.route('/todo/', methods=['POST'])
-def todos_POST():
+@app.route('/todo/<int:page_num>', methods=['POST'])
+@app.route('/todo/<int:page_num>/', methods=['POST'])
+def todos_POST(page_num):
     if not session.get('logged_in'):
         return redirect('/login')
     
@@ -135,16 +163,29 @@ def todos_POST():
         addTODO()
     if 'statusBtn' in request.form:
         updateStatus()
-    return redirect('/todo')
+    if 'deleteBtn' in request.form:
+        deleteBtnID=int(request.form['deleteBtn'])
+        #print('DELETING'+str(deleteBtnID))
+        dbsession.query(todosTB).filter(todosTB.id == deleteBtnID).delete()
+        dbsession.commit()
+        flash('TODO successfully deleted.',category='success')
+    return redirect('/todo/page/'+str(page_num))
 
-@app.route('/todo/<id>', methods=['POST'])
-def todo_delete(id):
+@app.route('/todo/<int:page_num>', methods=['POST'])
+@app.route('/todo/<int:page_num>/', methods=['POST'])
+def todo_delete(page_num):
     if not session.get('logged_in'):
         return redirect('/login')
-    g.db.execute("DELETE FROM todos WHERE id ='%s'" % id)
-    g.db.commit()
+    #g.db.execute("DELETE FROM todos WHERE id ='%s'" % id)
+    #g.db.commit()
+    deleteBtnID=-1
+    if 'deleteBtn' in request.form:
+        deleteBtnID=int(request.form['deleteBtn'])
+    print('DELETING'+str(deleteBtnID))
+    dbsession.query(todosTB).filter(todosTB.id.like(deleteBtnID)).delete()
+    dbsession.commit()
     flash('TODO successfully deleted.',category='success')
-    return redirect('/todo')
+    return redirect('/todo/page/'+str(page_num))
 
 @app.route('/todo/<id>/json', methods=['GET'])
 @app.route('/todo/<id>/json/', methods=['GET'])
@@ -152,16 +193,11 @@ def todo_view_json(id):
     if not session.get('logged_in'):
         return redirect('/login')
 
-    sql = "SELECT * FROM todos WHERE user_id = '%s' and id = '%s'";
-    cur = g.db.execute(sql % (session['user']['id'],id))
-    todo = cur.fetchone()
+    todo=dbsession.query(todosTB).filter(and_(todosTB.user_id.like(session['user']['id']),todosTB.id == id)).one()
     value_list=[]
-    for item in todo:
-        value_list.append(item)
 
-    table_cols = [description[0] for description in cur.description]
+    dictret = dict(todo.__dict__)
+    dictret.pop('_sa_instance_state', None)
+    print(dictret)
 
-    json_dict=dict(zip(table_cols, value_list))
-    json_str = json.dumps(json_dict,indent=4)
-    return jsonify(json_dict)
-#return render_template('todo_json.html', json_str=json_str)
+    return jsonify(dictret)
